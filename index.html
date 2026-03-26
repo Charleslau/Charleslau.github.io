@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e3c72">
+    <meta name="description" content="智能噪音监测与反馈系统">
+    <title>噪音反馈系统 Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --danger: #f5576c;
+            --success: #00d9ff;
+            --warning: #ffd700;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding-bottom: env(safe-area-inset-bottom);
+            overflow-x: hidden;
+        }
+        
+        /* 头部样式 */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            padding: 20px;
+            padding-top: env(safe-area-inset-top);
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .status-bar {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.2);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            transition: all 0.3s;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        }
+        
+        .status-dot.active {
+            background: #10b981;
+            box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        
+        /* 主容器 */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* 可视化区域 */
+        .viz-container {
+            background: rgba(0,0,0,0.4);
+            border-radius: 16px;
+            height: 180px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .db-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 52px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .db-label {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            opacity: 0.7;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+        
+        /* 统计网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+        
+        .stat-item {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--warning);
+            line-height: 1;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 控制组 */
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .value-badge {
+            background: rgba(102, 126, 234, 0.2);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* 输入控件 */
+        select, input[type="file"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        select:focus, input[type="number"]:focus {
+            border-color: var(--primary);
+            background: rgba(0,0,0,0.5);
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 40px;
+            -webkit-appearance: none;
+            background: transparent;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            margin-top: -10px;
+            border: 2px solid white;
+        }
+        
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb 0%, var(--danger) 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(245, 87, 108, 0.4);
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+            box-shadow: none;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* 复选框样式 */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+        }
+        
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        
+        /* 日志区域 */
+        .log-area {
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        
+        .log-item {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .log-time {
+            color: var(--success);
+            opacity: 0.8;
+            white-space: nowrap;
+        }
+        
+        .log-content {
+            color: #cbd5e1;
+        }
+        
+        .log-content.trigger {
+            color: var(--danger);
+            font-weight: 700;
+            animation: flash 0.5s;
+        }
+        
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        /* 遮罩动画 */
+        .trigger-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(245, 87, 108, 0.3) 0%, transparent 70%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 9999;
+        }
+        
+        .trigger-overlay.active {
+            opacity: 1;
+        }
+        
+        /* 提示信息 */
+        .info-box {
+            background: rgba(255, 215, 0, 0.1);
+            border-left: 4px solid var(--warning);
+            padding: 12px;
+            border-radius: 0 12px 12px 0;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-top: 12px;
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* 响应式优化 */
+        @media (min-width: 768px) {
+            .container { padding: 24px; }
+            .card { padding: 24px; }
+            .header h1 { font-size: 28px; }
+        }
+        
+        /* 加载动画 */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="trigger-overlay" id="overlay"></div>
+    
+    <div class="header">
+        <h1>🔊 噪音反馈系统</h1>
+        <div class="status-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">准备就绪</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 监测面板 -->
+        <div class="card">
+            <div class="card-title">📊 实时监测</div>
+            <div class="viz-container">
+                <canvas id="canvas"></canvas>
+                <div class="db-value" id="dbValue">--</div>
+                <div class="db-label">分贝值 / 低频分析</div>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="freqVal">--</div>
+                    <div class="stat-label">主导频率</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="lowFreqVal">--</div>
+                    <div class="stat-label">低频能量</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="triggerVal">0</div>
+                    <div class="stat-label">触发次数</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设备设置 -->
+        <div class="card">
+            <div class="card-title">🎛️ 设备配置</div>
+            <div class="control-group">
+                <div class="control-label">
+                    <span>🎤 输入设备</span>
+                </div>
+                <select id="inputDevice"></select>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span>🔊 提示音文件</span>
+                    <span style="font-size: 11px; opacity: 0.7;">MP3/WAV/OGG</span>
+                </div>
+                <input type="file" id="audioFile" accept="audio/*">
+            </div>
+            
+            <div class="info-box" id="iosHint" style="display: none;">
+                <strong>iOS/iPad 提示：</strong>请先在系统设置中连接蓝牙音箱，应用将通过系统音频输出播放提醒。
+            </div>
+        </div>
+
+        <!-- 参数设置 -->
+        <div class="card">
+            <div class="card-title">⚙️ 检测参数</div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span>📢 分贝阈值</span>
+                    <span class="value-badge" id="dbBadge">40 dB</span>
+                </div>
+                <input type="range" id="dbThreshold" min="20" max="90" value="40" step="1">
+            </div>
+            
+            <div class="control-group">
+                <div class="control-label">
+                    <span>🎯 低频敏感度</span>
+                    <span class="value-badge" id="senseBadge">中 (5)</span>
+                </div>
+                <input type="range" id="sensitivity" min="1" max="10" value="5" step="1">
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                <div class="control-group" style="margin-bottom: 0;">
+                    <div class="control-label">
+                        <span>⏱️ 窗口时间(秒)</span>
+                    </div>
+                    <input type="number" id="windowTime" value="5" min="1" max="30">
+                </div>
+                <div class="control-group" style="margin-bottom: 0;">
+                    <div class="control-label">
+                        <span>🔢 触发次数</span>
+                    </div>
+                    <input type="number" id="triggerTimes" value="3" min="1" max="10">
+                </div>
+            </div>
+            
+            <div class="control-group" style="margin-bottom: 16px;">
+                <div class="control-label">
+                    <span>⏳ 冷却时间(秒)</span>
+                </div>
+                <input type="number" id="cooldown" value="5" min="1" max="60">
+            </div>
+            
+            <label class="checkbox-wrapper">
+                <input type="checkbox" id="lowFreqMode" checked>
+                <span>仅检测低频噪音 (脚步声/桌椅挪动/掉落声，20-200Hz)</span>
+            </label>
+        </div>
+
+        <!-- 主控制按钮 -->
+        <div class="card" style="padding: 16px;">
+            <button class="btn btn-primary" id="toggleBtn" onclick="toggleMonitoring()">
+                <span>🚀 开始监测</span>
+            </button>
+        </div>
+
+        <!-- 事件日志 -->
+        <div class="card">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📝 事件日志</span>
+                <button onclick="clearLogs()" style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 8px; font-size: 12px; cursor: pointer;">清空</button>
+            </div>
+            <div class="log-area" id="logArea">
+                <div class="log-item">
+                    <span class="log-time">系统</span>
+                    <span class="log-content">等待启动...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 说明 -->
+        <div class="card">
+            <div class="card-title">📱 使用指南</div>
+            <div class="info-box">
+                <strong>推荐设置（楼上噪音）：</strong><br>
+                • 敏感度：7-8（捕捉轻微脚步）<br>
+                • 窗口时间：3-5秒（连续噪音周期）<br>
+                • 触发次数：2-3次（防止误报）<br>
+                • 保持应用在前台或锁定屏幕以保持监测
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态
+        const state = {
+            isMonitoring: false,
+            audioContext: null,
+            analyser: null,
+            microphone: null,
+            audioBuffer: [],
+            triggerCount: 0,
+            lastTriggerTime: 0,
+            recentDetections: [],
+            alertAudio: null,
+            config: {
+                dbThreshold: 40,
+                sensitivity: 5,
+                windowTime: 5,
+                triggerTimes: 3,
+                cooldown: 5,
+                lowFreqOnly: true
+            }
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initDevices();
+            setupListeners();
+            loadSettings();
+            
+            // 检测iOS
+            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                document.getElementById('iosHint').style.display = 'block';
+            }
+            
+            // 请求屏幕常亮锁（如果支持）
+            if ('wakeLock' in navigator) {
+                log('系统支持屏幕常亮功能');
+            }
+        });
+
+        // 设备初始化
+        async function initDevices() {
+            try {
+                // 先请求权限以获取标签
+                const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                tempStream.getTracks().forEach(t => t.stop());
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const inputs = devices.filter(d => d.kind === 'audioinput');
+                
+                const select = document.getElementById('inputDevice');
+                select.innerHTML = '';
+                
+                inputs.forEach((device, idx) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `麦克风 ${idx + 1}`;
+                    select.appendChild(option);
+                });
+                
+                log(`发现 ${inputs.length} 个音频输入设备`);
+            } catch (e) {
+                log('获取设备列表失败: ' + e.message, 'error');
+            }
+        }
+
+        // 事件监听
+        function setupListeners() {
+            // 实时更新显示
+            const dbSlider = document.getElementById('dbThreshold');
+            dbSlider.addEventListener('input', (e) => {
+                document.getElementById('dbBadge').textContent = e.target.value + ' dB';
+                state.config.dbThreshold = parseInt(e.target.value);
+                saveSettings();
+            });
+            
+            const senseSlider = document.getElementById('sensitivity');
+            senseSlider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                const labels = ['极低', '低', '偏低', '中低', '中', '中高', '高', '很高', '极高', '最大'];
+                document.getElementById('senseBadge').textContent = `${labels[val-1]} (${val})`;
+                state.config.sensitivity = val;
+                saveSettings();
+            });
+            
+            // 数值输入
+            ['windowTime', 'triggerTimes', 'cooldown'].forEach(id => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    state.config[id === 'windowTime' ? 'windowTime' : id === 'triggerTimes' ? 'triggerTimes' : 'cooldown'] = parseInt(e.target.value);
+                    saveSettings();
+                });
+            });
+            
+            // 复选框
+            document.getElementById('lowFreqMode').addEventListener('change', (e) => {
+                state.config.lowFreqOnly = e.target.checked;
+                saveSettings();
+            });
+            
+            // 文件上传
+            document.getElementById('audioFile').addEventListener('change', handleFileUpload);
+            
+            // 设备变化监听
+            navigator.mediaDevices.addEventListener('devicechange', initDevices);
+        }
+
+        // 设置持久化
+        function saveSettings() {
+            localStorage.setItem('noiseSettings', JSON.stringify(state.config));
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('noiseSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                Object.assign(state.config, settings);
+                
+                // 应用设置到UI
+                document.getElementById('dbThreshold').value = state.config.dbThreshold;
+                document.getElementById('dbBadge').textContent = state.config.dbThreshold + ' dB';
+                document.getElementById('sensitivity').value = state.config.sensitivity;
+                document.getElementById('windowTime').value = state.config.windowTime;
+                document.getElementById('triggerTimes').value = state.config.triggerTimes;
+                document.getElementById('cooldown').value = state.config.cooldown;
+                document.getElementById('lowFreqMode').checked = state.config.lowFreqOnly;
+                
+                const labels = ['极低', '低', '偏低', '中低', '中', '中高', '高', '很高', '极高', '最大'];
+                document.getElementById('senseBadge').textContent = `${labels[state.config.sensitivity-1]} (${state.config.sensitivity})`;
+                
+                log('已恢复上次设置');
+            }
+        }
+
+        // 音频上传处理
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const url = URL.createObjectURL(file);
+            state.alertAudio = new Audio(url);
+            state.alertAudio.load();
+            
+            // iOS需要用户交互才能播放
+            state.alertAudio.play().then(() => {
+                state.alertAudio.pause();
+                state.alertAudio.currentTime = 0;
+                log('提示音已加载: ' + file.name);
+            }).catch(() => {
+                log('提示音已就绪（启动后播放）');
+            });
+        }
+
+        // 主控制
+        async function toggleMonitoring() {
+            if (state.isMonitoring) {
+                stopMonitoring();
+            } else {
+                await startMonitoring();
+            }
+        }
+
+        // 启动监测
+        async function startMonitoring() {
+            const btn = document.getElementById('toggleBtn');
+            
+            try {
+                // 请求屏幕常亮
+                if ('wakeLock' in navigator) {
+                    state.wakeLock = await navigator.wakeLock.request('screen');
+                }
+                
+                const deviceId = document.getElementById('inputDevice').value;
+                const constraints = {
+                    audio: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                        sampleRate: 44100,
+                        channelCount: 1
+                    }
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                state.microphone = state.audioContext.createMediaStreamSource(stream);
+                state.analyser = state.audioContext.createAnalyser();
+                
+                state.analyser.fftSize = 4096; // 更高精度
+                state.analyser.smoothingTimeConstant = 0.85;
+                state.analyser.minDecibels = -90;
+                state.analyser.maxDecibels = -10;
+                
+                state.microphone.connect(state.analyser);
+                
+                // 默认提示音
+                if (!state.alertAudio) {
+                    state.alertAudio = createDefaultTone();
+                }
+                
+                state.isMonitoring = true;
+                updateStatus(true);
+                
+                btn.innerHTML = '<span class="spinner" style="width: 16px; height: 16px; border-width: 2px; margin: 0;"></span><span>停止监测</span>';
+                btn.className = 'btn btn-danger';
+                
+                log('监测已启动 - 检测低频噪音模式');
+                analyze();
+                
+            } catch (err) {
+                log('启动失败: ' + err.message, 'error');
+                alert('无法访问麦克风，请检查权限');
+            }
+        }
+
+        // 停止监测
+        function stopMonitoring() {
+            state.isMonitoring = false;
+            
+            if (state.animationId) {
+                cancelAnimationFrame(state.animationId);
+            }
+            
+            if (state.microphone) {
+                state.microphone.disconnect();
+                state.microphone = null;
+            }
+            
+            if (state.audioContext) {
+                state.audioContext.close();
+                state.audioContext = null;
+            }
+            
+            // 释放屏幕常亮
+            if (state.wakeLock) {
+                state.wakeLock.release();
+                state.wakeLock = null;
+            }
+            
+            updateStatus(false);
+            
+            const btn = document.getElementById('toggleBtn');
+            btn.innerHTML = '<span>🚀 开始监测</span>';
+            btn.className = 'btn btn-primary';
+            
+            document.getElementById('dbValue').textContent = '--';
+            document.getElementById('freqVal').textContent = '--';
+            document.getElementById('lowFreqVal').textContent = '--';
+            
+            log('监测已停止');
+        }
+
+        // 音频分析循环
+        function analyze() {
+            if (!state.isMonitoring || !state.analyser) return;
+            
+            const bufferLength = state.analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            const timeArray = new Uint8Array(bufferLength);
+            
+            state.analyser.getByteFrequencyData(dataArray);
+            state.analyser.getByteTimeDomainData(timeArray);
+            
+            // 计算分贝值（RMS）
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const x = (timeArray[i] - 128) / 128.0;
+                sum += x * x;
+            }
+            const rms = Math.sqrt(sum / bufferLength);
+            const db = 20 * Math.log10(rms) + 94; // 校准偏移
+            
+            const currentDb = Math.max(0, Math.round(db));
+            
+            // 频谱分析
+            const sampleRate = state.audioContext.sampleRate;
+            const binSize = sampleRate / 2 / bufferLength;
+            
+            // 分析20-200Hz（脚步声/撞击声）
+            const lowStart = Math.floor(20 / binSize);
+            const lowEnd = Math.floor(200 / binSize);
+            let lowFreqEnergy = 0;
+            let dominantFreq = 0;
+            let maxAmp = 0;
+            
+            for (let i = lowStart; i < lowEnd && i < bufferLength; i++) {
+                lowFreqEnergy += dataArray[i];
+                if (dataArray[i] > maxAmp) {
+                    maxAmp = dataArray[i];
+                    dominantFreq = Math.round(i * binSize);
+                }
+            }
+            
+            // 计算平均低频能量 (0-255范围)
+            const avgLowEnergy = Math.round(lowFreqEnergy / (lowEnd - lowStart));
+            
+            // 更新UI
+            document.getElementById('dbValue').textContent = currentDb;
+            document.getElementById('freqVal').textContent = dominantFreq + ' Hz';
+            document.getElementById('lowFreqVal').textContent = avgLowEnergy;
+            
+            // 绘制可视化
+            drawVisualizer(dataArray, bufferLength, binSize);
+            
+            // 检测逻辑
+            performDetection(currentDb, avgLowEnergy, dominantFreq);
+            
+            state.animationId = requestAnimationFrame(analyze);
+        }
+
+        // 检测算法
+        function performDetection(db, lowEnergy, dominantFreq) {
+            const now = Date.now();
+            
+            // 清理过期检测记录
+            state.recentDetections = state.recentDetections.filter(t => 
+                now - t < state.config.windowTime * 1000
+            );
+            
+            // 判断条件
+            let triggered = false;
+            
+            if (state.config.lowFreqOnly) {
+                // 低频模式：需要分贝+低频能量+频率范围
+                const energyThreshold = state.config.sensitivity * 6;
+                const isLowFreqRange = dominantFreq >= 20 && dominantFreq <= 200;
+                const isLoudEnough = db > state.config.dbThreshold;
+                const isEnergyEnough = lowEnergy > energyThreshold;
+                
+                if (isLoudEnough && isEnergyEnough && isLowFreqRange) {
+                    triggered = true;
+                }
+            } else {
+                // 全频段模式
+                if (db > state.config.dbThreshold) {
+                    triggered = true;
+                }
+            }
+            
+            if (triggered) {
+                // 检查冷却期
+                if (now - state.lastTriggerTime > state.config.cooldown * 1000) {
+                    state.recentDetections.push(now);
+                    
+                    // 检查是否达到触发阈值
+                    if (state.recentDetections.length >= state.config.triggerTimes) {
+                        executeTrigger(now);
+                    }
+                }
+            }
+        }
+
+        // 执行提醒
+        function executeTrigger(timestamp) {
+            state.lastTriggerTime = timestamp;
+            state.triggerCount++;
+            state.recentDetections = [];
+            
+            // 更新计数器
+            document.getElementById('triggerVal').textContent = state.triggerCount;
+            
+            // 视觉反馈
+            const overlay = document.getElementById('overlay');
+            overlay.classList.add('active');
+            setTimeout(() => overlay.classList.remove('active'), 600);
+            
+            // 播放音频
+            if (state.alertAudio) {
+                state.alertAudio.currentTime = 0;
+                state.alertAudio.play().catch(e => {
+                    log('音频播放失败: ' + e.message, 'error');
+                });
+            }
+            
+            // 震动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 200]);
+            }
+            
+            log(`🔔 触发提醒！检测到 ${state.config.triggerTimes} 次低频噪音`, 'trigger');
+        }
+
+        // 可视化绘制
+        function drawVisualizer(dataArray, bufferLength, binSize) {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 高清屏适配
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const width = rect.width;
+            const height = rect.height;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            // 绘制频谱柱
+            const bars = 64;
+            const barWidth = width / bars;
+            const step = Math.floor(bufferLength / bars);
+            
+            for (let i = 0; i < bars; i++) {
+                let sum = 0;
+                for (let j = 0; j < step; j++) {
+                    sum += dataArray[i * step + j];
+                }
+                const avg = sum / step;
+                const barHeight = (avg / 255) * height * 0.9;
+                
+                // 计算频率以着色
+                const freq = i * step * binSize;
+                const isTargetFreq = freq >= 20 && freq <= 200;
+                
+                if (isTargetFreq && state.config.lowFreqOnly) {
+                    // 目标频率用金色高亮
+                    ctx.fillStyle = `hsla(${40 + avg/3}, 100%, ${50 + avg/2}%, 0.8)`;
+                } else {
+                    // 其他频率用蓝色
+                    ctx.fillStyle = `hsla(${200 + avg/5}, 70%, ${30 + avg/3}%, 0.4)`;
+                }
+                
+                // 圆角柱
+                const x = i * barWidth;
+                const y = height - barHeight;
+                ctx.beginPath();
+                ctx.roundRect(x + 1, y, barWidth - 2, barHeight, 4);
+                ctx.fill();
+            }
+            
+            // 绘制阈值线
+            if (state.isMonitoring) {
+                const thresholdY = height - (state.config.dbThreshold / 100) * height * 0.8;
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                ctx.moveTo(0, thresholdY);
+                ctx.lineTo(width, thresholdY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 标注
+                ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
+                ctx.font = '11px sans-serif';
+                ctx.fillText('阈值', 4, thresholdY - 4);
+            }
+        }
+
+        // 生成默认提示音（Web Audio API）
+        function createDefaultTone() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // 创建双层音效
+            const playTone = () => {
+                const osc1 = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gain = ctx.createGain();
+                
+                osc1.frequency.value = 880; // A5
+                osc2.frequency.value = 1100; // 和声
+                
+                osc1.type = 'sine';
+                osc2.type = 'triangle';
+                
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ctx.destination);
+                
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                
+                osc1.start(ctx.currentTime);
+                osc2.start(ctx.currentTime);
+                osc1.stop(ctx.currentTime + 0.4);
+                osc2.stop(ctx.currentTime + 0.4);
+            };
+            
+            // 包装成Audio-like对象
+            return {
+                play: () => {
+                    if (ctx.state === 'suspended') ctx.resume();
+                    playTone();
+                },
+                pause: () => {},
+                get currentTime() { return 0; },
+                set currentTime(v) {}
+            };
+        }
+
+        // 状态更新
+        function updateStatus(active) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            if (active) {
+                dot.classList.add('active');
+                text.textContent = '监测中';
+            } else {
+                dot.classList.remove('active');
+                text.textContent = '已停止';
+            }
+        }
+
+        // 日志系统
+        function log(message, type = 'info') {
+            const container = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString('zh-CN', {hour12: false});
+            
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = time;
+            
+            const contentSpan = document.createElement('span');
+            contentSpan.className = 'log-content' + (type === 'trigger' ? ' trigger' : '');
+            contentSpan.textContent = message;
+            
+            item.appendChild(timeSpan);
+            item.appendChild(contentSpan);
+            
+            container.insertBefore(item, container.firstChild);
+            
+            // 限制50条
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logArea').innerHTML = '<div class="log-item"><span class="log-time">系统</span><span class="log-content">日志已清空</span></div>';
+        }
+
+        // 页面卸载清理
+        window.addEventListener('beforeunload', () => {
+            if (state.isMonitoring) stopMonitoring();
+        });
+
+        // 可见性变化处理（切换后台）
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && state.isMonitoring) {
+                log('应用进入后台，监测继续运行（请保持屏幕常亮）');
+            }
+        });
+    </script>
+</body>
+</html>
